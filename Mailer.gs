@@ -3,6 +3,30 @@
 // ============================================================
 
 /**
+ * HTML特殊文字をエンティティにエスケープする
+ * @param {string} str
+ * @returns {string}
+ */
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * URLをサニタイズする（javascript: プロトコルを遮断）
+ * @param {string} url
+ * @returns {string}
+ */
+function sanitizeUrl(url) {
+  const trimmed = String(url).trim();
+  return /^https?:\/\//i.test(trimmed) ? trimmed : '#';
+}
+
+/**
  * ソース名に対応するバッジ色を返す
  */
 function getSourceColor(source) {
@@ -21,6 +45,9 @@ function getSourceColor(source) {
 function buildItemCard(item) {
   const color = getSourceColor(item.source);
   const dateStr = Utilities.formatDate(item.date, 'Asia/Tokyo', 'MM/dd');
+  const safeSource = escapeHtml(item.source);
+  const safeTitle  = escapeHtml(item.title);
+  const safeUrl    = escapeHtml(sanitizeUrl(item.url));
   return `
     <div style="
       background:#ffffff;
@@ -39,23 +66,17 @@ function buildItemCard(item) {
           font-weight:bold;
           padding:2px 8px;
           border-radius:12px;
-        ">${item.source}</span>
+        ">${safeSource}</span>
         <span class="item-date" style="color:#9ca3af;font-size:12px;">${dateStr}</span>
       </div>
-      <a href="${item.url}" class="item-title" style="
+      <a href="${safeUrl}" class="item-title" style="
         color:#111827;
         font-size:15px;
         font-weight:600;
         text-decoration:none;
         line-height:1.4;
-      ">${item.title}</a>
-      <p class="item-summary" style="
-        color:#374151;
-        font-size:13px;
-        line-height:1.7;
-        margin:10px 0 0;
-      ">${item.summary || ''}</p>
-      <a href="${item.url}" class="read-more" style="
+      ">${safeTitle}</a>
+      <a href="${safeUrl}" class="read-more" style="
         display:inline-block;
         margin-top:10px;
         color:${color};
@@ -85,6 +106,7 @@ function buildEmailHtml(items, dateLabel) {
   let sections = '';
   for (const [source, groupItems] of Object.entries(groups)) {
     const color = getSourceColor(source);
+    const safeSource = escapeHtml(source);
     const cards = groupItems.map(buildItemCard).join('');
     sections += `
       <h2 class="section-header" style="
@@ -94,7 +116,7 @@ function buildEmailHtml(items, dateLabel) {
         border-bottom:2px solid ${color};
         padding-bottom:6px;
         margin:28px 0 16px;
-      ">${source}（${groupItems.length}件）</h2>
+      ">${safeSource}（${groupItems.length}件）</h2>
       ${cards}
     `;
   }
