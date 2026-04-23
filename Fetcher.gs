@@ -159,7 +159,6 @@ function fetchQiita() {
  */
 function fetchAllSources() {
   const all = [
-    ...fetchAnthropicBlog(),
     ...fetchGitHubReleases(),
     ...fetchZenn(),
     ...fetchQiita(),

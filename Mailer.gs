@@ -94,7 +94,7 @@ function buildItemCard(item) {
  * @returns {string}
  */
 function buildEmailHtml(items, dateLabel) {
-  const sheetUrl = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}`;
+  const sheetUrl = escapeHtml(sanitizeUrl(`https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}`));
 
   // ソース別にグループ化
   const groups = {};

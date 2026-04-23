@@ -20,17 +20,13 @@ function runDailyNews() {
       return;
     }
 
-    // 2. Claude API で要約
-    Logger.log('【Step 2】AI要約中...');
-    const summarized = summarizeAll(items);
+    // 2. Google Sheets に保存
+    Logger.log('【Step 2】Sheets に保存中...');
+    const savedCount = saveToSheet(items);
 
-    // 3. Google Sheets に保存
-    Logger.log('【Step 3】Sheets に保存中...');
-    const savedCount = saveToSheet(summarized);
-
-    // 4. メール送信
-    Logger.log('【Step 4】メール送信中...');
-    sendEmail(summarized);
+    // 3. メール送信
+    Logger.log('【Step 3】メール送信中...');
+    sendEmail(items);
 
     Logger.log(`=== 完了 ／ 新規保存: ${savedCount}件 ===`);
 
@@ -68,7 +64,7 @@ function setup() {
   const props = PropertiesService.getScriptProperties();
 
   // 必須プロパティの確認
-  const required = ['CLAUDE_API_KEY', 'SHEET_ID'];
+  const required = ['SHEET_ID'];
   const missing = required.filter(k => !props.getProperty(k));
   if (missing.length > 0) {
     throw new Error(`スクリプトプロパティが未設定です: ${missing.join(', ')}\n` +
