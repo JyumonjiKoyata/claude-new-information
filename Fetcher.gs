@@ -108,9 +108,24 @@ function fetchZenn() {
     for (const a of articles) {
       const date = new Date(a.published_at);
       if (date < cutoff) continue;
+
+      // a.path の安全性をホスト名で検証（パス操作・オープンリダイレクト対策）
+      let articleUrl;
+      try {
+        const parsed = new URL('https://zenn.dev' + String(a.path || ''));
+        if (parsed.hostname !== 'zenn.dev') {
+          Logger.log('Zenn: 不正なパスをスキップ: ' + a.path);
+          continue;
+        }
+        articleUrl = parsed.href;
+      } catch (_) {
+        Logger.log('Zenn: 無効な URL をスキップ: ' + a.path);
+        continue;
+      }
+
       items.push({
         title: a.title,
-        url: 'https://zenn.dev' + a.path,
+        url: articleUrl,
         date,
         source: 'Zenn',
       });
@@ -159,6 +174,7 @@ function fetchQiita() {
  */
 function fetchAllSources() {
   const all = [
+    ...fetchAnthropicBlog(),
     ...fetchGitHubReleases(),
     ...fetchZenn(),
     ...fetchQiita(),

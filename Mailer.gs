@@ -76,6 +76,12 @@ function buildItemCard(item) {
         text-decoration:none;
         line-height:1.4;
       ">${safeTitle}</a>
+      ${item.summary ? `<p class="item-summary" style="
+        color:#374151;
+        font-size:13px;
+        line-height:1.6;
+        margin:8px 0 0;
+      ">${escapeHtml(item.summary)}</p>` : ''}
       <a href="${safeUrl}" class="read-more" style="
         display:inline-block;
         margin-top:10px;

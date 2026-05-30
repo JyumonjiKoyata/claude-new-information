@@ -20,23 +20,29 @@ function runDailyNews() {
       return;
     }
 
-    // 2. Google Sheets に保存
-    Logger.log('【Step 2】Sheets に保存中...');
-    const savedCount = saveToSheet(items);
+    // 2. Claude API で要約生成
+    Logger.log('【Step 2】要約生成中...');
+    const summarizedItems = summarizeAll(items);
 
-    // 3. メール送信
-    Logger.log('【Step 3】メール送信中...');
-    sendEmail(items);
+    // 3. Google Sheets に保存
+    Logger.log('【Step 3】Sheets に保存中...');
+    const savedCount = saveToSheet(summarizedItems);
+
+    // 4. メール送信
+    Logger.log('【Step 4】メール送信中...');
+    sendEmail(summarizedItems);
 
     Logger.log(`=== 完了 ／ 新規保存: ${savedCount}件 ===`);
 
   } catch (e) {
-    Logger.log('runDailyNews エラー: ' + e);
-    // エラーが起きた場合もメールで通知
+    // スタックトレースを含む詳細はログにのみ記録
+    Logger.log('runDailyNews エラー: ' + (e && e.stack ? e.stack : e));
+    // メールにはメッセージ概要のみ送信（内部パス・行番号の漏洩防止）
+    const summary = e instanceof Error ? e.message : String(e).substring(0, 200);
     GmailApp.sendEmail(
       CONFIG.EMAIL_TO,
       '【Claude Code ニュース】エラーが発生しました',
-      `実行中にエラーが発生しました。\n\n${e}\n\nGASのログを確認してください。`
+      `実行中にエラーが発生しました。\n\nエラー概要: ${summary}\n\nGAS のログで詳細を確認してください。`
     );
   }
 }
