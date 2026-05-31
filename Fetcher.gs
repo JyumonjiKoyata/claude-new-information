@@ -17,7 +17,8 @@ function getCutoffDate() {
  * @returns {Array<{title, url, date, source}>}
  */
 function fetchAnthropicBlog() {
-  const RSS_URL = 'https://www.anthropic.com/rss.xml';
+  // 公式 RSS 廃止のため、コミュニティ維持フィードを使用
+  const RSS_URL = 'https://raw.githubusercontent.com/taobojlen/anthropic-rss-feed/main/anthropic_news_rss.xml';
   const items = [];
   try {
     const res = UrlFetchApp.fetch(RSS_URL, { muteHttpExceptions: true });
@@ -109,19 +110,14 @@ function fetchZenn() {
       const date = new Date(a.published_at);
       if (date < cutoff) continue;
 
-      // a.path の安全性をホスト名で検証（パス操作・オープンリダイレクト対策）
-      let articleUrl;
-      try {
-        const parsed = new URL('https://zenn.dev' + String(a.path || ''));
-        if (parsed.hostname !== 'zenn.dev') {
-          Logger.log('Zenn: 不正なパスをスキップ: ' + a.path);
-          continue;
-        }
-        articleUrl = parsed.href;
-      } catch (_) {
-        Logger.log('Zenn: 無効な URL をスキップ: ' + a.path);
+      // a.path の安全性を正規表現で検証（GAS では new URL() が不安定なため）
+      const pathStr = String(a.path || '');
+      // 例: /username/articles/slug-or-hex （ユーザー名はアンダースコア可）
+      if (!/^\/[A-Za-z0-9_-]+\/articles\/[A-Za-z0-9_-]+$/.test(pathStr)) {
+        Logger.log('Zenn: 無効なパスをスキップ: ' + pathStr);
         continue;
       }
+      const articleUrl = 'https://zenn.dev' + pathStr;
 
       items.push({
         title: a.title,

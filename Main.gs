@@ -20,17 +20,13 @@ function runDailyNews() {
       return;
     }
 
-    // 2. Claude API で要約生成
-    Logger.log('【Step 2】要約生成中...');
-    const summarizedItems = summarizeAll(items);
+    // 2. Google Sheets に保存
+    Logger.log('【Step 2】Sheets に保存中...');
+    const savedCount = saveToSheet(items);
 
-    // 3. Google Sheets に保存
-    Logger.log('【Step 3】Sheets に保存中...');
-    const savedCount = saveToSheet(summarizedItems);
-
-    // 4. メール送信
-    Logger.log('【Step 4】メール送信中...');
-    sendEmail(summarizedItems);
+    // 3. メール送信
+    Logger.log('【Step 3】メール送信中...');
+    sendEmail(items);
 
     Logger.log(`=== 完了 ／ 新規保存: ${savedCount}件 ===`);
 
