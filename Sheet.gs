@@ -35,6 +35,18 @@ function getOrCreateSheet() {
 }
 
 /**
+ * セル値の数式インジェクションを防ぐ
+ * 先頭が = + - @ の場合、Sheets が数式として解釈しないよう ' を前置する
+ * （' は文字列マーカーとして扱われ、表示・読み取り値には含まれない）
+ * @param {string} value
+ * @returns {string}
+ */
+function sanitizeCell(value) {
+  const s = String(value);
+  return /^[=+\-@]/.test(s) ? "'" + s : s;
+}
+
+/**
  * 既存URLのセットを返す（重複チェック用）
  * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet
  * @returns {Set<string>}
@@ -48,14 +60,14 @@ function getExistingUrls(sheet) {
 
 /**
  * アイテムをシートに保存（重複スキップ）
- * @param {Array} items - summary付きアイテム配列
- * @returns {number} 新規保存件数
+ * @param {Array} items
+ * @returns {Array} 新規保存したアイテム配列（メール送信対象）
  */
 function saveToSheet(items) {
   const sheet = getOrCreateSheet();
   const existingUrls = getExistingUrls(sheet);
   const now = new Date();
-  let savedCount = 0;
+  const newItems = [];
 
   for (const item of items) {
     if (existingUrls.has(item.url)) {
@@ -68,16 +80,16 @@ function saveToSheet(items) {
 
     sheet.appendRow([
       dateStr,
-      item.source,
-      item.title,
-      item.url,
-      item.summary || '',
+      sanitizeCell(item.source),
+      sanitizeCell(item.title),
+      sanitizeCell(item.url),
+      '', // 要約列（廃止済み・既存シートのレイアウト維持のため空欄）
       nowStr,
     ]);
     existingUrls.add(item.url);
-    savedCount++;
+    newItems.push(item);
   }
 
-  Logger.log(`シート保存完了: ${savedCount}件`);
-  return savedCount;
+  Logger.log(`シート保存完了: ${newItems.length}件`);
+  return newItems;
 }

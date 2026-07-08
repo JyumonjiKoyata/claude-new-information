@@ -76,12 +76,6 @@ function buildItemCard(item) {
         text-decoration:none;
         line-height:1.4;
       ">${safeTitle}</a>
-      ${item.summary ? `<p class="item-summary" style="
-        color:#374151;
-        font-size:13px;
-        line-height:1.6;
-        margin:8px 0 0;
-      ">${escapeHtml(item.summary)}</p>` : ''}
       <a href="${safeUrl}" class="read-more" style="
         display:inline-block;
         margin-top:10px;
@@ -144,7 +138,6 @@ function buildEmailHtml(items, dateLabel) {
       .badge         { font-size: 17px !important; }
       .item-date     { font-size: 18px !important; }
       .item-title    { font-size: 23px !important; }
-      .item-summary  { font-size: 20px !important; }
       .read-more     { font-size: 18px !important; }
       .section-header { font-size: 24px !important; }
       .header-label  { font-size: 17px !important; }
@@ -202,7 +195,7 @@ function buildEmailHtml(items, dateLabel) {
 
 /**
  * メールを送信する
- * @param {Array} items - summary付きアイテム配列
+ * @param {Array} items
  */
 function sendEmail(items) {
   const today = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy年MM月dd日');

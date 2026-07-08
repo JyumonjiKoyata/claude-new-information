@@ -20,15 +20,15 @@ function runDailyNews() {
       return;
     }
 
-    // 2. Google Sheets に保存
+    // 2. Google Sheets に保存（新規アイテムのみ返る）
     Logger.log('【Step 2】Sheets に保存中...');
-    const savedCount = saveToSheet(items);
+    const newItems = saveToSheet(items);
 
-    // 3. メール送信
+    // 3. メール送信（保存済みの重複を除いた新規分のみ）
     Logger.log('【Step 3】メール送信中...');
-    sendEmail(items);
+    sendEmail(newItems);
 
-    Logger.log(`=== 完了 ／ 新規保存: ${savedCount}件 ===`);
+    Logger.log(`=== 完了 ／ 新規保存: ${newItems.length}件 ===`);
 
   } catch (e) {
     // スタックトレースを含む詳細はログにのみ記録
@@ -66,7 +66,7 @@ function setup() {
   const props = PropertiesService.getScriptProperties();
 
   // 必須プロパティの確認
-  const required = ['SHEET_ID'];
+  const required = ['SHEET_ID', 'EMAIL_TO'];
   const missing = required.filter(k => !props.getProperty(k));
   if (missing.length > 0) {
     throw new Error(`スクリプトプロパティが未設定です: ${missing.join(', ')}\n` +
