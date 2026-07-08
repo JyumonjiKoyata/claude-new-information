@@ -2,11 +2,6 @@
 // 設定ファイル - ここだけ編集すれば動きます
 // ============================================================
 const CONFIG = {
-  // Claude API キー（ScriptProperties に保存）
-  get CLAUDE_API_KEY() {
-    return PropertiesService.getScriptProperties().getProperty('CLAUDE_API_KEY');
-  },
-
   // GitHub Personal Access Token（任意・レート制限緩和のため推奨）
   get GITHUB_TOKEN() {
     return PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN') || '';

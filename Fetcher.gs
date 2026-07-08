@@ -43,6 +43,12 @@ function fetchAnthropicBlog() {
       const desc = (entry.getChildText('description') || '').toLowerCase();
       if (!lowerTitle.includes('claude') && !desc.includes('claude code')) continue;
 
+      // 非公式フィードのため、リンク先を anthropic.com に限定（フィード改ざん対策）
+      if (!/^https:\/\/(www\.)?anthropic\.com\//i.test(link.trim())) {
+        Logger.log('Anthropic Blog: anthropic.com 以外のリンクをスキップ: ' + link);
+        continue;
+      }
+
       items.push({ title, url: link, date: pubDate, source: 'Anthropic Blog' });
       if (items.length >= CONFIG.MAX_ITEMS_PER_SOURCE) break;
     }
