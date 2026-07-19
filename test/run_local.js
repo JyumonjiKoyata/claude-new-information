@@ -22,6 +22,9 @@ const sandbox = {
   Utilities: {
     formatDate: (d) => d.toISOString().slice(0, 10),
   },
+  LockService: {
+    getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }),
+  },
 };
 vm.createContext(sandbox);
 

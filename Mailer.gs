@@ -17,13 +17,13 @@ function escapeHtml(str) {
 }
 
 /**
- * URLをサニタイズする（javascript: プロトコルを遮断）
+ * URLをサニタイズする（https 以外のスキームを遮断）
  * @param {string} url
  * @returns {string}
  */
 function sanitizeUrl(url) {
   const trimmed = String(url).trim();
-  return /^https?:\/\//i.test(trimmed) ? trimmed : '#';
+  return /^https:\/\//i.test(trimmed) ? trimmed : '#';
 }
 
 /**

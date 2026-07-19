@@ -73,6 +73,59 @@ function testSanitizeUrl() {
   assert(sanitizeUrl('https://a.com') === 'https://a.com', 'sanitizeUrl: httpsはそのまま');
   assert(sanitizeUrl('javascript:alert(1)') === '#', 'sanitizeUrl: javascript:は#に置換される');
   assert(sanitizeUrl('  https://a.com  ') === 'https://a.com', 'sanitizeUrl: 前後の空白はtrimされる');
+  assert(sanitizeUrl('http://example.com') === '#', 'sanitizeUrl: http://は#に置換される（https限定）');
+}
+
+/**
+ * buildSheetRows のテスト
+ */
+function testBuildSheetRows() {
+  const now = new Date('2026-07-19T10:00:00+09:00');
+  const makeItem = (url, title) => ({
+    title: title || 'タイトル',
+    url,
+    date: new Date('2026-07-19T08:00:00+09:00'),
+    source: 'Zenn',
+  });
+
+  // 全件新規
+  {
+    const items = [makeItem('https://zenn.dev/a/articles/x'), makeItem('https://zenn.dev/b/articles/y')];
+    const { rows, newItems } = buildSheetRows(items, new Set(), now);
+    assert(rows.length === 2 && newItems.length === 2, 'buildSheetRows: 全件新規はrows/newItemsとも2件');
+    assert(rows.every(r => r.length === 6), 'buildSheetRows: 各rowは6列');
+    assert(rows.every(r => r[4] === ''), 'buildSheetRows: 5列目（要約列）は空文字');
+  }
+
+  // 既存URL除外
+  {
+    const items = [makeItem('https://zenn.dev/a/articles/x'), makeItem('https://zenn.dev/b/articles/y')];
+    const existing = new Set(['https://zenn.dev/a/articles/x']);
+    const { rows, newItems } = buildSheetRows(items, existing, now);
+    assert(rows.length === 1 && newItems.length === 1, 'buildSheetRows: 既存URLは除外され1件のみ');
+    assert(newItems[0].url === 'https://zenn.dev/b/articles/y', 'buildSheetRows: 残るのは新規URLのアイテム');
+  }
+
+  // バッチ内重複
+  {
+    const items = [makeItem('https://zenn.dev/a/articles/x'), makeItem('https://zenn.dev/a/articles/x')];
+    const { rows, newItems } = buildSheetRows(items, new Set(), now);
+    assert(rows.length === 1 && newItems.length === 1, 'buildSheetRows: バッチ内の同一URLは1件のみ');
+  }
+
+  // sanitizeCell 適用
+  {
+    const items = [makeItem('https://zenn.dev/a/articles/x', '=SUM(A1)')];
+    const { rows } = buildSheetRows(items, new Set(), now);
+    assert(rows[0][2] === "'=SUM(A1)", 'buildSheetRows: titleにsanitizeCellが適用される');
+  }
+
+  // newItems は入力 item と同一オブジェクト
+  {
+    const item = makeItem('https://zenn.dev/a/articles/x');
+    const { newItems } = buildSheetRows([item], new Set(), now);
+    assert(newItems[0] === item, 'buildSheetRows: newItemsの要素は入力itemと同一オブジェクト');
+  }
 }
 
 /**
@@ -117,6 +170,7 @@ function runAllTests() {
   testIsFeedStale();
   testSanitizeCell();
   testSanitizeUrl();
+  testBuildSheetRows();
   testEscapeHtml();
   testBuildEmailHtmlWarnings();
   testBuildEmailHtmlEmpty();

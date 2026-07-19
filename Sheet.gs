@@ -59,26 +59,24 @@ function getExistingUrls(sheet) {
 }
 
 /**
- * アイテムをシートに保存（重複スキップ）
+ * 保存対象の行データと新規アイテムを作る（重複URLは除外）
  * @param {Array} items
- * @returns {Array} 新規保存したアイテム配列（メール送信対象）
+ * @param {Set<string>} existingUrls 既存URLの集合（新規分は本関数内で追加される）
+ * @param {Date} now
+ * @returns {{rows: Array<Array<string>>, newItems: Array}}
  */
-function saveToSheet(items) {
-  const sheet = getOrCreateSheet();
-  const existingUrls = getExistingUrls(sheet);
-  const now = new Date();
+function buildSheetRows(items, existingUrls, now) {
+  const rows = [];
   const newItems = [];
+  const nowStr = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm');
 
   for (const item of items) {
     if (existingUrls.has(item.url)) {
       Logger.log('重複スキップ: ' + item.url);
       continue;
     }
-
     const dateStr = Utilities.formatDate(item.date, 'Asia/Tokyo', 'yyyy/MM/dd');
-    const nowStr  = Utilities.formatDate(now,      'Asia/Tokyo', 'yyyy/MM/dd HH:mm');
-
-    sheet.appendRow([
+    rows.push([
       dateStr,
       sanitizeCell(item.source),
       sanitizeCell(item.title),
@@ -88,6 +86,21 @@ function saveToSheet(items) {
     ]);
     existingUrls.add(item.url);
     newItems.push(item);
+  }
+  return { rows, newItems };
+}
+
+/**
+ * アイテムをシートに保存（重複スキップ）
+ * @param {Array} items
+ * @returns {Array} 新規保存したアイテム配列（メール送信対象）
+ */
+function saveToSheet(items) {
+  const sheet = getOrCreateSheet();
+  const { rows, newItems } = buildSheetRows(items, getExistingUrls(sheet), new Date());
+
+  if (rows.length > 0) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, HEADERS.length).setValues(rows);
   }
 
   Logger.log(`シート保存完了: ${newItems.length}件`);
