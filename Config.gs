@@ -25,4 +25,7 @@ const CONFIG = {
 
   // 1ソースあたり最大取得件数
   MAX_ITEMS_PER_SOURCE: 5,
+
+  // フィードの lastBuildDate がこの日数より古ければ警告
+  FEED_STALE_DAYS: 7,
 };

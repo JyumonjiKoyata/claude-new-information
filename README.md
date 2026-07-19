@@ -41,10 +41,9 @@ GAS エディタで「プロジェクトの設定」→「スクリプト プロ
 |-------------|-----|
 | `SHEET_ID` | 手順1でコピーしたスプレッドシートID（必須） |
 | `EMAIL_TO` | ニュースの送信先メールアドレス（必須） |
-| `GITHUB_TOKEN` | GitHub の Personal Access Token（任意・推奨） |
+| `GITHUB_TOKEN` | 設定不要（無認証運用。設定すれば認証に使われる） |
 
-> **GITHUB_TOKEN の取得**: GitHub → Settings → Developer settings → Personal access tokens  
-> スコープは `public_repo` のみで OK
+> **GitHub API について**: 2026-07-09 より PAT 不使用の無認証運用です。無認証のレート制限（60 req/h/IP、GAS は共有 IP）により稀に取得失敗することがありますが、その回はスキップされ翌回に回復します。
 
 ### 4. セットアップ関数を実行
 
@@ -98,5 +97,5 @@ claude-new-information/
 |------|------|
 | メールが届かない | GAS のログを確認 / スクリプトプロパティを確認 |
 | 「新着なし」メールが毎日来る | `DAYS_BACK` を増やして `runTest` で確認 |
-| GitHub の取得が失敗する | `GITHUB_TOKEN` を設定するとレート制限が緩和 |
+| GitHub の取得が失敗する | 無認証レート制限の可能性。翌回の実行で自然回復します |
 | Zenn/Qiita で件数が少ない | タグ名の揺れがある場合あり（`claudecode` / `claude-code`） |

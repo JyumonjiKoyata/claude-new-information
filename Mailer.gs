@@ -127,6 +127,13 @@ function buildEmailHtml(items, dateLabel) {
     </div>
   `;
 
+  const warningsHtml = RUNTIME_WARNINGS.length === 0 ? '' : `
+    <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:4px;">⚠️ 運用警告</div>
+      ${RUNTIME_WARNINGS.map(w => `<div class="warning-text" style="font-size:12px;color:#92400e;">${escapeHtml(w)}</div>`).join('')}
+    </div>
+  `;
+
   return `
 <!DOCTYPE html>
 <html lang="ja">
@@ -170,6 +177,7 @@ function buildEmailHtml(items, dateLabel) {
 
     <!-- 本文 -->
     <div style="background:#f3f4f6;padding:24px 32px;">
+      ${warningsHtml}
       ${items.length > 0 ? sections : noNewsHtml}
     </div>
 

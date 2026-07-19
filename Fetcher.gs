@@ -2,6 +2,9 @@
 // 各ソースからデータを取得する関数群
 // ============================================================
 
+// 実行中に検出した運用警告（メール本文に表示される）
+const RUNTIME_WARNINGS = [];
+
 /**
  * カットオフ日時を返す（DAYS_BACK日前の00:00 JST）
  */
@@ -10,6 +13,31 @@ function getCutoffDate() {
   now.setDate(now.getDate() - CONFIG.DAYS_BACK);
   now.setHours(0, 0, 0, 0);
   return now;
+}
+
+/**
+ * 文字列を Date に変換する。無効な日付は null を返す
+ * @param {string} value
+ * @returns {Date|null}
+ */
+function parseValidDate(value) {
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * フィードが古い（更新停止の疑いがある）かどうかを判定する
+ * @param {string} lastBuildDateStr フィードの lastBuildDate 文字列
+ * @param {Date} now 現在時刻
+ * @param {number} staleDays 何日更新がなければ古いとみなすか
+ * @returns {boolean}
+ */
+function isFeedStale(lastBuildDateStr, now, staleDays) {
+  const lastBuild = parseValidDate(lastBuildDateStr);
+  if (!lastBuild) return true;
+  const diffMs = now.getTime() - lastBuild.getTime();
+  const diffDays = diffMs / (24 * 60 * 60 * 1000);
+  return diffDays > staleDays;
 }
 
 /**
@@ -31,12 +59,20 @@ function fetchAnthropicBlog() {
     const entries = channel.getChildren('item');
     const cutoff = getCutoffDate();
 
+    // フィードの鮮度を確認（更新停止の早期検知）
+    const lastBuild = channel.getChildText('lastBuildDate') || '';
+    if (isFeedStale(lastBuild, new Date(), CONFIG.FEED_STALE_DAYS)) {
+      const msg = `Anthropic Blog フィードが ${CONFIG.FEED_STALE_DAYS} 日以上更新されていません（lastBuildDate: ${lastBuild || '不明'}）。フィード提供元の停止の可能性があります。`;
+      Logger.log('警告: ' + msg);
+      RUNTIME_WARNINGS.push(msg);
+    }
+
     for (const entry of entries) {
       const title   = entry.getChildText('title') || '';
       const link    = entry.getChildText('link')  || '';
-      const pubDate = new Date(entry.getChildText('pubDate') || '');
+      const pubDate = parseValidDate(entry.getChildText('pubDate') || '');
 
-      if (isNaN(pubDate) || pubDate < cutoff) continue;
+      if (!pubDate || pubDate < cutoff) continue;
 
       // Claude Code 関連のみ絞り込み
       const lowerTitle = title.toLowerCase();
@@ -78,7 +114,11 @@ function fetchGitHubReleases() {
     const cutoff = getCutoffDate();
 
     for (const r of releases) {
-      const date = new Date(r.published_at);
+      const date = parseValidDate(r.published_at);
+      if (!date) {
+        Logger.log('GitHub Releases: 無効な日付をスキップ: ' + r.published_at);
+        continue;
+      }
       if (date < cutoff) continue;
       items.push({
         title: `[Release] ${r.tag_name}: ${r.name || r.tag_name}`,
@@ -113,7 +153,11 @@ function fetchZenn() {
     const cutoff = getCutoffDate();
 
     for (const a of articles) {
-      const date = new Date(a.published_at);
+      const date = parseValidDate(a.published_at);
+      if (!date) {
+        Logger.log('Zenn: 無効な日付をスキップ: ' + a.published_at);
+        continue;
+      }
       if (date < cutoff) continue;
 
       // a.path の安全性を正規表現で検証（GAS では new URL() が不安定なため）
@@ -143,7 +187,7 @@ function fetchZenn() {
  * @returns {Array<{title, url, date, source}>}
  */
 function fetchQiita() {
-  const API_URL = `https://qiita.com/api/v2/items?query=tag:claude-code&per_page=${CONFIG.MAX_ITEMS_PER_SOURCE}&sort=created`;
+  const API_URL = `https://qiita.com/api/v2/items?query=tag:claude-code&per_page=${CONFIG.MAX_ITEMS_PER_SOURCE}`;
   const items = [];
   try {
     const res = UrlFetchApp.fetch(API_URL, { muteHttpExceptions: true });
@@ -155,7 +199,11 @@ function fetchQiita() {
     const cutoff = getCutoffDate();
 
     for (const a of articles) {
-      const date = new Date(a.created_at);
+      const date = parseValidDate(a.created_at);
+      if (!date) {
+        Logger.log('Qiita: 無効な日付をスキップ: ' + a.created_at);
+        continue;
+      }
       if (date < cutoff) continue;
       items.push({
         title: a.title,
