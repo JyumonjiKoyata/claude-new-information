@@ -31,7 +31,8 @@ function sanitizeUrl(url) {
  */
 function getSourceColor(source) {
   const colors = {
-    'Anthropic Blog': '#d97706',
+    'Anthropic News': '#d97706',
+    'Anthropic Engineering': '#b45309',
     'GitHub Releases': '#1d4ed8',
     'Zenn':  '#3b82f6',
     'Qiita': '#55c500',

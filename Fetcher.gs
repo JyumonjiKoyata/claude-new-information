@@ -41,17 +41,31 @@ function isFeedStale(lastBuildDateStr, now, staleDays) {
 }
 
 /**
- * Anthropic 公式ブログの RSS を取得
+ * Anthropic 公式情報を RSS から取得（News + Engineering）
+ * 公式 RSS 廃止のため、コミュニティ維持フィード（Olshansk/rss-feeds, 毎時更新）を使用
  * @returns {Array<{title, url, date, source}>}
  */
 function fetchAnthropicBlog() {
-  // 公式 RSS 廃止のため、コミュニティ維持フィードを使用
-  const RSS_URL = 'https://raw.githubusercontent.com/taobojlen/anthropic-rss-feed/main/anthropic_news_rss.xml';
+  const NEWS_URL = 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml';
+  const ENG_URL  = 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_engineering.xml';
+  return [
+    ...fetchAnthropicRss(NEWS_URL, 'Anthropic News'),
+    ...fetchAnthropicRss(ENG_URL,  'Anthropic Engineering'),
+  ];
+}
+
+/**
+ * 指定した Anthropic RSS フィードから記事を取得する共通処理
+ * @param {string} rssUrl フィードURL
+ * @param {string} sourceName 表示用ソース名
+ * @returns {Array<{title, url, date, source}>}
+ */
+function fetchAnthropicRss(rssUrl, sourceName) {
   const items = [];
   try {
-    const res = UrlFetchApp.fetch(RSS_URL, { muteHttpExceptions: true });
+    const res = UrlFetchApp.fetch(rssUrl, { muteHttpExceptions: true });
     if (res.getResponseCode() !== 200) {
-      Logger.log('Anthropic RSS fetch failed: ' + res.getResponseCode());
+      Logger.log(sourceName + ' RSS fetch failed: ' + res.getResponseCode());
       return items;
     }
     const doc = XmlService.parse(res.getContentText());
@@ -62,7 +76,7 @@ function fetchAnthropicBlog() {
     // フィードの鮮度を確認（更新停止の早期検知）
     const lastBuild = channel.getChildText('lastBuildDate') || '';
     if (isFeedStale(lastBuild, new Date(), CONFIG.FEED_STALE_DAYS)) {
-      const msg = `Anthropic Blog フィードが ${CONFIG.FEED_STALE_DAYS} 日以上更新されていません（lastBuildDate: ${lastBuild || '不明'}）。フィード提供元の停止の可能性があります。`;
+      const msg = `${sourceName} フィードが ${CONFIG.FEED_STALE_DAYS} 日以上更新されていません（lastBuildDate: ${lastBuild || '不明'}）。フィード提供元の停止の可能性があります。`;
       Logger.log('警告: ' + msg);
       RUNTIME_WARNINGS.push(msg);
     }
@@ -81,15 +95,15 @@ function fetchAnthropicBlog() {
 
       // 非公式フィードのため、リンク先を anthropic.com に限定（フィード改ざん対策）
       if (!/^https:\/\/(www\.)?anthropic\.com\//i.test(link.trim())) {
-        Logger.log('Anthropic Blog: anthropic.com 以外のリンクをスキップ: ' + link);
+        Logger.log(sourceName + ': anthropic.com 以外のリンクをスキップ: ' + link);
         continue;
       }
 
-      items.push({ title, url: link, date: pubDate, source: 'Anthropic Blog' });
+      items.push({ title, url: link, date: pubDate, source: sourceName });
       if (items.length >= CONFIG.MAX_ITEMS_PER_SOURCE) break;
     }
   } catch (e) {
-    Logger.log('fetchAnthropicBlog error: ' + e);
+    Logger.log('fetchAnthropicRss(' + sourceName + ') error: ' + e);
   }
   return items;
 }

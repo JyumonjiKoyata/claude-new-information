@@ -6,7 +6,8 @@
 
 | ソース | 内容 |
 |--------|------|
-| Anthropic 公式ブログ | リリースノート・公式発表 |
+| Anthropic News | 公式発表・お知らせ（Olshansk community RSS） |
+| Anthropic Engineering | エンジニアリングブログ（Olshansk community RSS） |
 | GitHub Releases | `anthropics/claude-code` のリリース |
 | Zenn | `claudecode` タグの日本語記事 |
 | Qiita | `claude-code` タグの日本語記事 |
