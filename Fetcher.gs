@@ -26,6 +26,40 @@ function parseValidDate(value) {
 }
 
 /**
+ * 日付文字列をパースし、無効値やカットオフより古い場合は null を返す（無効値はログに記録）
+ * @param {string} rawDate
+ * @param {string} label ログ表示用のソース名
+ * @param {Date} cutoff このDate以降のみ有効とみなす
+ * @returns {Date|null}
+ */
+function parseDateOrSkip(rawDate, label, cutoff) {
+  const date = parseValidDate(rawDate);
+  if (!date) {
+    Logger.log(label + ': 無効な日付をスキップ: ' + rawDate);
+    return null;
+  }
+  return date < cutoff ? null : date;
+}
+
+/**
+ * GitHub Releases の html_url が想定ドメイン・パス内かを検証する
+ * @param {string} url
+ * @returns {boolean}
+ */
+function isTrustedGithubReleaseUrl(url) {
+  return /^https:\/\/github\.com\/anthropics\/claude-code\/releases\//i.test(String(url || ''));
+}
+
+/**
+ * Qiita の url が qiita.com ドメインかを検証する
+ * @param {string} url
+ * @returns {boolean}
+ */
+function isTrustedQiitaUrl(url) {
+  return /^https:\/\/qiita\.com\//i.test(String(url || ''));
+}
+
+/**
  * フィードが古い（更新停止の疑いがある）かどうかを判定する
  * @param {string} lastBuildDateStr フィードの lastBuildDate 文字列
  * @param {Date} now 現在時刻
@@ -110,7 +144,7 @@ function fetchAnthropicRss(rssUrl, sourceName) {
 
 /**
  * GitHub anthropics/claude-code のリリース情報を取得
- * @returns {Array<{title, url, date, source, body}>}
+ * @returns {Array<{title, url, date, source}>}
  */
 function fetchGitHubReleases() {
   const API_URL = 'https://api.github.com/repos/anthropics/claude-code/releases?per_page=10';
@@ -128,18 +162,17 @@ function fetchGitHubReleases() {
     const cutoff = getCutoffDate();
 
     for (const r of releases) {
-      const date = parseValidDate(r.published_at);
-      if (!date) {
-        Logger.log('GitHub Releases: 無効な日付をスキップ: ' + r.published_at);
+      const date = parseDateOrSkip(r.published_at, 'GitHub Releases', cutoff);
+      if (!date) continue;
+      if (!isTrustedGithubReleaseUrl(r.html_url)) {
+        Logger.log('GitHub Releases: 想定外URLをスキップ: ' + r.html_url);
         continue;
       }
-      if (date < cutoff) continue;
       items.push({
         title: `[Release] ${r.tag_name}: ${r.name || r.tag_name}`,
         url: r.html_url,
         date,
         source: 'GitHub Releases',
-        body: (r.body || '').substring(0, 800),
       });
       if (items.length >= CONFIG.MAX_ITEMS_PER_SOURCE) break;
     }
@@ -167,12 +200,8 @@ function fetchZenn() {
     const cutoff = getCutoffDate();
 
     for (const a of articles) {
-      const date = parseValidDate(a.published_at);
-      if (!date) {
-        Logger.log('Zenn: 無効な日付をスキップ: ' + a.published_at);
-        continue;
-      }
-      if (date < cutoff) continue;
+      const date = parseDateOrSkip(a.published_at, 'Zenn', cutoff);
+      if (!date) continue;
 
       // a.path の安全性を正規表現で検証（GAS では new URL() が不安定なため）
       const pathStr = String(a.path || '');
@@ -213,12 +242,12 @@ function fetchQiita() {
     const cutoff = getCutoffDate();
 
     for (const a of articles) {
-      const date = parseValidDate(a.created_at);
-      if (!date) {
-        Logger.log('Qiita: 無効な日付をスキップ: ' + a.created_at);
+      const date = parseDateOrSkip(a.created_at, 'Qiita', cutoff);
+      if (!date) continue;
+      if (!isTrustedQiitaUrl(a.url)) {
+        Logger.log('Qiita: 想定外URLをスキップ: ' + a.url);
         continue;
       }
-      if (date < cutoff) continue;
       items.push({
         title: a.title,
         url: a.url,

@@ -45,3 +45,22 @@
 
 現時点で未対応の既知リスク：
 - Anthropic News / Engineering のソースは第三者維持の非公式フィード（Olshansk/rss-feeds、公式 RSS 廃止のため）。リンク先ドメイン検証で偽リンクは遮断済みだが、タイトル文言の改ざんは検出できない（残存リスク: Low）。
+
+---
+
+## 更新履歴（2026-09-08 コードレビュー・再監査）
+
+新規の Critical/High 脆弱性は検出されず。以下、軽微な問題点を修正：
+
+| 項目 | 深刻度 | 状態 |
+|------|--------|------|
+| GitHub Releases / Qiita のURLがドメイン無検証でメールに埋め込まれていた（Zenn/Anthropicとの非対称） | Low（多層防御） | ✅ 修正済み（`isTrustedGithubReleaseUrl()` / `isTrustedQiitaUrl()` 導入） |
+| `runTest()` が `Object.defineProperty` を不必要に使用し非enumerable化する副作用があった | Low（コード品質） | ✅ 修正済み（直接代入 + `try/finally` に変更） |
+| `fetchGitHubReleases()` の `body` フィールドが未使用のまま残存（要約機能廃止の残骸） | Low（デッドコード） | ✅ 修正済み（削除） |
+| メール内のソース表示順序がオブジェクト挿入順に依存し不定だった | Low（機能バグ） | ✅ 修正済み（`SOURCES` 配列で表示順を固定） |
+| Fetcher.gs の日付パース処理がGitHub/Zenn/Qiitaで重複（DRY違反） | 情報（保守性） | ✅ 修正済み（`parseDateOrSkip()` に共通化） |
+| Sheets の「要約」列が廃止済み機能の名残のまま | 情報 | 対応不要と判断（既存シートとの列数整合性を優先）。README にトラブルシューティングとして説明を追記 |
+
+依存パッケージ（npm）の脆弱性チェック：`package.json` は存在せず、GAS標準APIのみを使用しているため対象外（変更なし）。
+
+検証：`node test/run_local.js` で新規追加分含め全48件のユニットテストがPASSすることを確認。

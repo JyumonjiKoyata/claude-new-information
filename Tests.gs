@@ -77,6 +77,46 @@ function testSanitizeUrl() {
 }
 
 /**
+ * isTrustedGithubReleaseUrl のテスト
+ */
+function testIsTrustedGithubReleaseUrl() {
+  assert(isTrustedGithubReleaseUrl('https://github.com/anthropics/claude-code/releases/tag/v1.0.0') === true,
+    'isTrustedGithubReleaseUrl: 正規のリリースURLはtrue');
+  assert(isTrustedGithubReleaseUrl('https://evil.com/anthropics/claude-code/releases/tag/v1.0.0') === false,
+    'isTrustedGithubReleaseUrl: 別ドメインはfalse');
+  assert(isTrustedGithubReleaseUrl('http://github.com/anthropics/claude-code/releases/tag/v1.0.0') === false,
+    'isTrustedGithubReleaseUrl: httpはfalse');
+  assert(isTrustedGithubReleaseUrl('') === false, 'isTrustedGithubReleaseUrl: 空文字はfalse');
+  assert(isTrustedGithubReleaseUrl(undefined) === false, 'isTrustedGithubReleaseUrl: undefinedはfalse');
+}
+
+/**
+ * isTrustedQiitaUrl のテスト
+ */
+function testIsTrustedQiitaUrl() {
+  assert(isTrustedQiitaUrl('https://qiita.com/someuser/items/abc123') === true,
+    'isTrustedQiitaUrl: 正規のQiita URLはtrue');
+  assert(isTrustedQiitaUrl('https://evil.com/qiita.com/items/abc123') === false,
+    'isTrustedQiitaUrl: 別ドメインはfalse');
+  assert(isTrustedQiitaUrl('http://qiita.com/someuser/items/abc123') === false,
+    'isTrustedQiitaUrl: httpはfalse');
+  assert(isTrustedQiitaUrl('') === false, 'isTrustedQiitaUrl: 空文字はfalse');
+}
+
+/**
+ * parseDateOrSkip のテスト
+ */
+function testParseDateOrSkip() {
+  const cutoff = new Date('2026-09-01T00:00:00Z');
+  assert(parseDateOrSkip('2026-09-05T00:00:00Z', 'X', cutoff) instanceof Date,
+    'parseDateOrSkip: cutoff以降の有効日付はDateを返す');
+  assert(parseDateOrSkip('garbage', 'X', cutoff) === null,
+    'parseDateOrSkip: 無効な文字列はnullを返す');
+  assert(parseDateOrSkip('2026-08-01T00:00:00Z', 'X', cutoff) === null,
+    'parseDateOrSkip: cutoffより古い日付はnullを返す');
+}
+
+/**
  * buildSheetRows のテスト
  */
 function testBuildSheetRows() {
@@ -161,6 +201,31 @@ function testBuildEmailHtmlEmpty() {
 }
 
 /**
+ * buildEmailHtml のソース表示順序テスト（入力順によらず固定順で表示される）
+ */
+function testBuildEmailHtmlSourceOrder() {
+  RUNTIME_WARNINGS.length = 0;
+  const makeItem = (source, url) => ({ title: 'タイトル', url, date: new Date('2026-07-19T08:00:00+09:00'), source });
+  // わざと SOURCES の並びと逆順で渡す
+  const items = [
+    makeItem('Qiita', 'https://qiita.com/a/items/1'),
+    makeItem('Zenn', 'https://zenn.dev/a/articles/x'),
+    makeItem('GitHub Releases', 'https://github.com/anthropics/claude-code/releases/tag/v1'),
+    makeItem('Anthropic Engineering', 'https://anthropic.com/engineering/1'),
+    makeItem('Anthropic News', 'https://anthropic.com/news/1'),
+  ];
+  const html = buildEmailHtml(items, '2026年07月19日');
+
+  const idx = (name) => html.indexOf(`${name}（1件）`);
+  assert(idx('Anthropic News') < idx('Anthropic Engineering'), 'buildEmailHtml: Anthropic NewsがEngineeringより先');
+  assert(idx('Anthropic Engineering') < idx('GitHub Releases'), 'buildEmailHtml: EngineeringがGitHub Releasesより先');
+  assert(idx('GitHub Releases') < idx('Zenn'), 'buildEmailHtml: GitHub ReleasesがZennより先');
+  assert(idx('Zenn') < idx('Qiita'), 'buildEmailHtml: ZennがQiitaより先');
+
+  RUNTIME_WARNINGS.length = 0;
+}
+
+/**
  * 全テストを実行する
  */
 function runAllTests() {
@@ -170,10 +235,14 @@ function runAllTests() {
   testIsFeedStale();
   testSanitizeCell();
   testSanitizeUrl();
+  testIsTrustedGithubReleaseUrl();
+  testIsTrustedQiitaUrl();
+  testParseDateOrSkip();
   testBuildSheetRows();
   testEscapeHtml();
   testBuildEmailHtmlWarnings();
   testBuildEmailHtmlEmpty();
+  testBuildEmailHtmlSourceOrder();
 
   Logger.log(`=== 全 ${TEST_COUNT} 件のテストが PASS しました ===`);
 }

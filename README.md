@@ -100,3 +100,4 @@ claude-new-information/
 | 「新着なし」メールが毎日来る | `DAYS_BACK` を増やして `runTest` で確認 |
 | GitHub の取得が失敗する | 無認証レート制限の可能性。翌回の実行で自然回復します |
 | Zenn/Qiita で件数が少ない | タグ名の揺れがある場合あり（`claudecode` / `claude-code`） |
+| Sheets の「要約」列が常に空欄 | 仕様通りです。AI要約機能は廃止済みで、既存シートとの互換性維持のため列のみ残しています |

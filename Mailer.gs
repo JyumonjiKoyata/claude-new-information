@@ -26,18 +26,21 @@ function sanitizeUrl(url) {
   return /^https:\/\//i.test(trimmed) ? trimmed : '#';
 }
 
+// 表示順序・バッジ色の単一情報源（メール内のソース表示順はこの並びに従う）
+const SOURCES = [
+  { name: 'Anthropic News',        color: '#d97706' },
+  { name: 'Anthropic Engineering', color: '#b45309' },
+  { name: 'GitHub Releases',       color: '#1d4ed8' },
+  { name: 'Zenn',                  color: '#3b82f6' },
+  { name: 'Qiita',                 color: '#55c500' },
+];
+
 /**
  * ソース名に対応するバッジ色を返す
  */
 function getSourceColor(source) {
-  const colors = {
-    'Anthropic News': '#d97706',
-    'Anthropic Engineering': '#b45309',
-    'GitHub Releases': '#1d4ed8',
-    'Zenn':  '#3b82f6',
-    'Qiita': '#55c500',
-  };
-  return colors[source] || '#6b7280';
+  const found = SOURCES.find(s => s.name === source);
+  return found ? found.color : '#6b7280';
 }
 
 /**
@@ -104,8 +107,16 @@ function buildEmailHtml(items, dateLabel) {
     groups[item.source].push(item);
   }
 
+  // 表示順序を SOURCES の並びに固定し、未知ソースは末尾に表示する
+  const knownOrder = SOURCES.map(s => s.name);
+  const orderedSources = [
+    ...knownOrder.filter(name => groups[name]),
+    ...Object.keys(groups).filter(name => !knownOrder.includes(name)),
+  ];
+
   let sections = '';
-  for (const [source, groupItems] of Object.entries(groups)) {
+  for (const source of orderedSources) {
+    const groupItems = groups[source];
     const color = getSourceColor(source);
     const safeSource = escapeHtml(source);
     const cards = groupItems.map(buildItemCard).join('');

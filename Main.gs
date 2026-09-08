@@ -59,11 +59,12 @@ function runDailyNews() {
 function runTest() {
   // テスト時は期間を広げる
   const originalDaysBack = CONFIG.DAYS_BACK;
-  Object.defineProperty(CONFIG, 'DAYS_BACK', { value: 7, configurable: true });
-
-  runDailyNews();
-
-  Object.defineProperty(CONFIG, 'DAYS_BACK', { value: originalDaysBack, configurable: true });
+  CONFIG.DAYS_BACK = 7;
+  try {
+    runDailyNews();
+  } finally {
+    CONFIG.DAYS_BACK = originalDaysBack;
+  }
 }
 
 /**
