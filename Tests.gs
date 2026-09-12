@@ -1,6 +1,7 @@
 // ============================================================
-// ユニットテスト（フレームワーク不使用）
-// GAS エディタで runAllTests を実行、または node test/run_local.js
+// ユニットテスト（フレームワーク不使用・ローカル専用）
+// .claspignore により GAS へは push されない（本番プロジェクトの関数一覧を汚さないため）
+// 実行するには node test/run_local.js を使う
 // ============================================================
 
 // 実行したアサーション数（GAS エディタ実行時のログ確認用）
@@ -177,34 +178,30 @@ function testEscapeHtml() {
 }
 
 /**
- * buildEmailHtml の統合テスト（RUNTIME_WARNINGS あり）
+ * buildEmailHtml の統合テスト（warnings あり）
  */
 function testBuildEmailHtmlWarnings() {
-  RUNTIME_WARNINGS.length = 0;
-  RUNTIME_WARNINGS.push('テスト警告<script>alert(1)</script>');
+  const warnings = ['テスト警告<script>alert(1)</script>'];
 
-  const html = buildEmailHtml([], '2026年07月19日');
-  assert(html.includes('運用警告'), 'buildEmailHtml: RUNTIME_WARNINGSがあれば運用警告セクションが表示される');
+  const html = buildEmailHtml([], '2026年07月19日', warnings);
+  assert(html.includes('運用警告'), 'buildEmailHtml: warningsがあれば運用警告セクションが表示される');
   assert(html.includes('テスト警告&lt;script&gt;alert(1)&lt;/script&gt;'), 'buildEmailHtml: 警告文はエスケープされて挿入される');
   assert(!html.includes('<script>alert(1)</script>'), 'buildEmailHtml: 生の<script>タグは含まれない');
-
-  RUNTIME_WARNINGS.length = 0;
 }
 
 /**
- * buildEmailHtml の統合テスト（アイテム0件）
+ * buildEmailHtml の統合テスト（アイテム0件・warnings省略）
  */
 function testBuildEmailHtmlEmpty() {
-  RUNTIME_WARNINGS.length = 0;
   const html = buildEmailHtml([], '2026年07月19日');
   assert(html.includes('本日は新着情報がありませんでした'), 'buildEmailHtml: 空配列時は新着なしメッセージを含む');
+  assert(!html.includes('運用警告'), 'buildEmailHtml: warnings省略時は運用警告セクションが表示されない');
 }
 
 /**
  * buildEmailHtml のソース表示順序テスト（入力順によらず固定順で表示される）
  */
 function testBuildEmailHtmlSourceOrder() {
-  RUNTIME_WARNINGS.length = 0;
   const makeItem = (source, url) => ({ title: 'タイトル', url, date: new Date('2026-07-19T08:00:00+09:00'), source });
   // わざと SOURCES の並びと逆順で渡す
   const items = [
@@ -221,8 +218,32 @@ function testBuildEmailHtmlSourceOrder() {
   assert(idx('Anthropic Engineering') < idx('GitHub Releases'), 'buildEmailHtml: EngineeringがGitHub Releasesより先');
   assert(idx('GitHub Releases') < idx('Zenn'), 'buildEmailHtml: GitHub ReleasesがZennより先');
   assert(idx('Zenn') < idx('Qiita'), 'buildEmailHtml: ZennがQiitaより先');
+}
 
-  RUNTIME_WARNINGS.length = 0;
+/**
+ * isTrustedPattern のテスト（URL/パス信頼性検証の共通ヘルパー）
+ */
+function testIsTrustedPattern() {
+  assert(isTrustedPattern('https://a.com/x', /^https:\/\/a\.com\//) === true,
+    'isTrustedPattern: パターン一致でtrue');
+  assert(isTrustedPattern('https://evil.com/x', /^https:\/\/a\.com\//) === false,
+    'isTrustedPattern: パターン不一致でfalse');
+  assert(isTrustedPattern('  https://a.com/x  ', /^https:\/\/a\.com\//) === true,
+    'isTrustedPattern: 前後の空白はtrimされる');
+  assert(isTrustedPattern(undefined, /^https:\/\/a\.com\//) === false,
+    'isTrustedPattern: undefinedはfalse');
+}
+
+/**
+ * getCutoffDate のテスト（daysBack引数による可変性）
+ */
+function testGetCutoffDate() {
+  const cutoffDefault = getCutoffDate(CONFIG.DAYS_BACK);
+  const cutoff7 = getCutoffDate(7);
+  assert(cutoff7.getTime() < cutoffDefault.getTime(),
+    'getCutoffDate: daysBackが大きいほど過去の日付を返す');
+  assert(cutoffDefault.getHours() === 0 && cutoffDefault.getMinutes() === 0,
+    'getCutoffDate: 00:00に正規化される');
 }
 
 /**
@@ -243,6 +264,8 @@ function runAllTests() {
   testBuildEmailHtmlWarnings();
   testBuildEmailHtmlEmpty();
   testBuildEmailHtmlSourceOrder();
+  testIsTrustedPattern();
+  testGetCutoffDate();
 
   Logger.log(`=== 全 ${TEST_COUNT} 件のテストが PASS しました ===`);
 }

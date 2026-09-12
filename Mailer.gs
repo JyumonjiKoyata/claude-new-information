@@ -92,46 +92,62 @@ function buildItemCard(item) {
 }
 
 /**
- * HTMLメール本文を生成
+ * アイテムをソース別にグループ化し、SOURCES の並びに固定する（未知ソースは末尾）
  * @param {Array} items
- * @param {string} dateLabel
- * @returns {string}
+ * @returns {Array<{source: string, groupItems: Array}>}
  */
-function buildEmailHtml(items, dateLabel) {
-  const sheetUrl = escapeHtml(sanitizeUrl(`https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}`));
-
-  // ソース別にグループ化
+function groupItemsBySource(items) {
   const groups = {};
   for (const item of items) {
     if (!groups[item.source]) groups[item.source] = [];
     groups[item.source].push(item);
   }
 
-  // 表示順序を SOURCES の並びに固定し、未知ソースは末尾に表示する
   const knownOrder = SOURCES.map(s => s.name);
   const orderedSources = [
     ...knownOrder.filter(name => groups[name]),
     ...Object.keys(groups).filter(name => !knownOrder.includes(name)),
   ];
 
-  let sections = '';
-  for (const source of orderedSources) {
-    const groupItems = groups[source];
-    const color = getSourceColor(source);
-    const safeSource = escapeHtml(source);
-    const cards = groupItems.map(buildItemCard).join('');
-    sections += `
-      <h2 class="section-header" style="
-        color:${color};
-        font-size:16px;
-        font-weight:700;
-        border-bottom:2px solid ${color};
-        padding-bottom:6px;
-        margin:28px 0 16px;
-      ">${safeSource}（${groupItems.length}件）</h2>
-      ${cards}
-    `;
-  }
+  return orderedSources.map(source => ({ source, groupItems: groups[source] }));
+}
+
+/**
+ * 1ソース分のセクション（見出し＋カード群）のHTMLを生成
+ * @param {string} source
+ * @param {Array} groupItems
+ * @returns {string}
+ */
+function buildSourceSection(source, groupItems) {
+  const color = getSourceColor(source);
+  const safeSource = escapeHtml(source);
+  const cards = groupItems.map(buildItemCard).join('');
+  return `
+    <h2 class="section-header" style="
+      color:${color};
+      font-size:16px;
+      font-weight:700;
+      border-bottom:2px solid ${color};
+      padding-bottom:6px;
+      margin:28px 0 16px;
+    ">${safeSource}（${groupItems.length}件）</h2>
+    ${cards}
+  `;
+}
+
+/**
+ * HTMLメール本文を生成
+ * @param {Array} items
+ * @param {string} dateLabel
+ * @param {string[]} [warnings] 運用警告メッセージ一覧
+ * @returns {string}
+ */
+function buildEmailHtml(items, dateLabel, warnings = []) {
+  const sheetUrl = escapeHtml(sanitizeUrl(`https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}`));
+
+  const sections = groupItemsBySource(items)
+    .map(({ source, groupItems }) => buildSourceSection(source, groupItems))
+    .join('');
 
   const noNewsHtml = `
     <div style="text-align:center;padding:40px;color:#9ca3af;">
@@ -139,10 +155,10 @@ function buildEmailHtml(items, dateLabel) {
     </div>
   `;
 
-  const warningsHtml = RUNTIME_WARNINGS.length === 0 ? '' : `
+  const warningsHtml = warnings.length === 0 ? '' : `
     <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
       <div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:4px;">⚠️ 運用警告</div>
-      ${RUNTIME_WARNINGS.map(w => `<div class="warning-text" style="font-size:12px;color:#92400e;">${escapeHtml(w)}</div>`).join('')}
+      ${warnings.map(w => `<div class="warning-text" style="font-size:12px;color:#92400e;">${escapeHtml(w)}</div>`).join('')}
     </div>
   `;
 
@@ -216,11 +232,12 @@ function buildEmailHtml(items, dateLabel) {
 /**
  * メールを送信する
  * @param {Array} items
+ * @param {string[]} [warnings] 運用警告メッセージ一覧
  */
-function sendEmail(items) {
+function sendEmail(items, warnings = []) {
   const today = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy年MM月dd日');
   const subject = `${CONFIG.EMAIL_SUBJECT_PREFIX} ${today}（${items.length}件）`;
-  const html = buildEmailHtml(items, today);
+  const html = buildEmailHtml(items, today, warnings);
 
   GmailApp.sendEmail(CONFIG.EMAIL_TO, subject, '', { htmlBody: html });
   Logger.log(`メール送信完了: ${subject}`);

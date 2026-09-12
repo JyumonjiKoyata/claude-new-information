@@ -1,3 +1,4 @@
 test/**
 *.md
 .clasp.json
+Tests.gs

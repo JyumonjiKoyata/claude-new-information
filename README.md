@@ -87,7 +87,8 @@ claude-new-information/
 ├── Fetcher.gs           # データ収集
 ├── Sheet.gs             # Sheets 保存
 ├── Mailer.gs            # メール送信
-└── Main.gs              # エントリーポイント
+├── Main.gs              # エントリーポイント
+└── Tests.gs             # ユニットテスト（ローカル専用・.claspignoreによりGASへはpushされない）
 ```
 
 ---

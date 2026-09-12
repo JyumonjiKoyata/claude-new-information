@@ -4,11 +4,12 @@
 
 /**
  * メイン処理（毎日このファンクションをトリガーする）
+ * @param {number} [daysBack] 省略時は CONFIG.DAYS_BACK。手動確認用に期間を広げたい場合に指定する
  */
-function runDailyNews() {
+function runDailyNews(daysBack = CONFIG.DAYS_BACK) {
   // 同時実行（トリガー＋手動）による重複を防ぐ
   const lock = LockService.getScriptLock();
-  if (!lock.tryLock(30 * 1000)) {
+  if (!lock.tryLock(CONFIG.LOCK_TIMEOUT_MS)) {
     Logger.log('別の実行が進行中のためスキップします');
     return;
   }
@@ -18,12 +19,12 @@ function runDailyNews() {
     try {
       // 1. 全ソースからデータ取得
       Logger.log('【Step 1】情報収集中...');
-      const items = fetchAllSources();
+      const { items, warnings } = fetchAllSources(daysBack);
       Logger.log(`取得件数: ${items.length}件`);
 
       if (items.length === 0) {
         Logger.log('新着なし。空のメールを送信します。');
-        sendEmail([]);
+        sendEmail([], warnings);
         return;
       }
 
@@ -33,7 +34,7 @@ function runDailyNews() {
 
       // 3. メール送信（保存済みの重複を除いた新規分のみ）
       Logger.log('【Step 3】メール送信中...');
-      sendEmail(newItems);
+      sendEmail(newItems, warnings);
 
       Logger.log(`=== 完了 ／ 新規保存: ${newItems.length}件 ===`);
 
@@ -54,17 +55,11 @@ function runDailyNews() {
 }
 
 /**
- * 手動テスト用（DAYS_BACKを7にして過去1週間分を取得）
+ * 手動動作確認用（過去7日分を対象に実行）
+ * 注意: ドライランではない。実際に EMAIL_TO へメール送信し、Sheets にも書き込まれる
  */
 function runTest() {
-  // テスト時は期間を広げる
-  const originalDaysBack = CONFIG.DAYS_BACK;
-  CONFIG.DAYS_BACK = 7;
-  try {
-    runDailyNews();
-  } finally {
-    CONFIG.DAYS_BACK = originalDaysBack;
-  }
+  runDailyNews(7);
 }
 
 /**

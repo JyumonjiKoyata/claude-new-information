@@ -28,4 +28,25 @@ const CONFIG = {
 
   // フィードの lastBuildDate がこの日数より古ければ警告
   FEED_STALE_DAYS: 7,
+
+  // 同時実行防止ロックの最大待機時間（ミリ秒）
+  LOCK_TIMEOUT_MS: 30 * 1000,
+
+  // GitHub Releases API の1回あたり取得件数
+  GITHUB_RELEASES_PER_PAGE: 10,
+
+  // Anthropic 公式情報（コミュニティ維持の代替RSS。公式RSS廃止のため使用）
+  ANTHROPIC_NEWS_RSS_URL: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml',
+  ANTHROPIC_ENGINEERING_RSS_URL: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_engineering.xml',
+
+  // GitHub Releases API
+  GITHUB_RELEASES_API_URL: 'https://api.github.com/repos/anthropics/claude-code/releases',
+
+  // Zenn API
+  ZENN_API_URL: 'https://zenn.dev/api/articles',
+  ZENN_TOPIC: 'claudecode',
+
+  // Qiita API
+  QIITA_API_URL: 'https://qiita.com/api/v2/items',
+  QIITA_TAG: 'claude-code',
 };
