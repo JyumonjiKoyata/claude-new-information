@@ -57,24 +57,24 @@ function testIsFeedStale() {
 }
 
 /**
- * sanitizeCell のテスト
+ * escapeSheetFormula のテスト
  */
-function testSanitizeCell() {
-  assert(sanitizeCell('=SUM(A1)') === "'=SUM(A1)", 'sanitizeCell: =始まりはエスケープされる');
-  assert(sanitizeCell('+x') === "'+x", 'sanitizeCell: +始まりはエスケープされる');
-  assert(sanitizeCell('-x') === "'-x", 'sanitizeCell: -始まりはエスケープされる');
-  assert(sanitizeCell('@x') === "'@x", 'sanitizeCell: @始まりはエスケープされる');
-  assert(sanitizeCell('normal') === 'normal', 'sanitizeCell: 通常文字列はそのまま');
+function testEscapeSheetFormula() {
+  assert(escapeSheetFormula('=SUM(A1)') === "'=SUM(A1)", 'escapeSheetFormula: =始まりはエスケープされる');
+  assert(escapeSheetFormula('+x') === "'+x", 'escapeSheetFormula: +始まりはエスケープされる');
+  assert(escapeSheetFormula('-x') === "'-x", 'escapeSheetFormula: -始まりはエスケープされる');
+  assert(escapeSheetFormula('@x') === "'@x", 'escapeSheetFormula: @始まりはエスケープされる');
+  assert(escapeSheetFormula('normal') === 'normal', 'escapeSheetFormula: 通常文字列はそのまま');
 }
 
 /**
- * sanitizeUrl のテスト
+ * enforceHttpsScheme のテスト
  */
-function testSanitizeUrl() {
-  assert(sanitizeUrl('https://a.com') === 'https://a.com', 'sanitizeUrl: httpsはそのまま');
-  assert(sanitizeUrl('javascript:alert(1)') === '#', 'sanitizeUrl: javascript:は#に置換される');
-  assert(sanitizeUrl('  https://a.com  ') === 'https://a.com', 'sanitizeUrl: 前後の空白はtrimされる');
-  assert(sanitizeUrl('http://example.com') === '#', 'sanitizeUrl: http://は#に置換される（https限定）');
+function testEnforceHttpsScheme() {
+  assert(enforceHttpsScheme('https://a.com') === 'https://a.com', 'enforceHttpsScheme: httpsはそのまま');
+  assert(enforceHttpsScheme('javascript:alert(1)') === '#', 'enforceHttpsScheme: javascript:は#に置換される');
+  assert(enforceHttpsScheme('  https://a.com  ') === 'https://a.com', 'enforceHttpsScheme: 前後の空白はtrimされる');
+  assert(enforceHttpsScheme('http://example.com') === '#', 'enforceHttpsScheme: http://は#に置換される（https限定）');
 }
 
 /**
@@ -154,11 +154,11 @@ function testBuildSheetRows() {
     assert(rows.length === 1 && newItems.length === 1, 'buildSheetRows: バッチ内の同一URLは1件のみ');
   }
 
-  // sanitizeCell 適用
+  // escapeSheetFormula 適用
   {
     const items = [makeItem('https://zenn.dev/a/articles/x', '=SUM(A1)')];
     const { rows } = buildSheetRows(items, new Set(), now);
-    assert(rows[0][2] === "'=SUM(A1)", 'buildSheetRows: titleにsanitizeCellが適用される');
+    assert(rows[0][2] === "'=SUM(A1)", 'buildSheetRows: titleにescapeSheetFormulaが適用される');
   }
 
   // newItems は入力 item と同一オブジェクト
@@ -246,6 +246,201 @@ function testGetCutoffDate() {
     'getCutoffDate: 00:00に正規化される');
 }
 
+// ============================================================
+// I/O系テスト
+// UrlFetchApp / SpreadsheetApp / GmailApp / XmlService のスタブ
+// （test/run_local.js が提供）が必要なため、node test/run_local.js 経由でのみ実行可能
+// ============================================================
+
+/**
+ * Anthropic RSS の <item> 断片を組み立てるテスト用ヘルパー
+ */
+function __anthropicItemXml(title, link, pubDate, description) {
+  return `<item>
+<title>${title}</title>
+<link>${link}</link>
+<pubDate>${pubDate}</pubDate>
+<description>${description}</description>
+</item>`;
+}
+
+/**
+ * Anthropic RSS フィード全体を組み立てるテスト用ヘルパー
+ */
+function __buildAnthropicRss(lastBuildDate, itemXmlList) {
+  return `<?xml version="1.0"?>
+<rss version="2.0"><channel>
+<lastBuildDate>${lastBuildDate}</lastBuildDate>
+${itemXmlList.join('\n')}
+</channel></rss>`;
+}
+
+/**
+ * fetchAnthropicRss のテスト（UrlFetchApp/XmlServiceスタブ経由）
+ */
+function testFetchAnthropicRss() {
+  const url = 'https://example.com/anthropic-rss-test';
+  const now = new Date();
+  const recentPubDate = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString();
+  const recentBuildDate = now.toISOString();
+  const staleBuildDate = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000).toISOString();
+
+  // 正常系: cutoff内・claudeキーワード一致・anthropic.comリンクの記事が返る
+  {
+    const xml = __buildAnthropicRss(recentBuildDate, [
+      __anthropicItemXml('Claude Code new feature', 'https://www.anthropic.com/news/example', recentPubDate, 'about claude code'),
+    ]);
+    __fetchResponses.set(url, { responseCode: 200, contentText: xml });
+    const { items, warnings } = fetchAnthropicRss(url, 'TestSource', 3);
+    assert(items.length === 1, 'fetchAnthropicRss: 正常系は1件返る');
+    assert(items[0].url === 'https://www.anthropic.com/news/example', 'fetchAnthropicRss: urlが取得できる');
+    assert(items[0].source === 'TestSource', 'fetchAnthropicRss: sourceが指定値になる');
+    assert(warnings.length === 0, 'fetchAnthropicRss: 鮮度が新しければwarningsは空');
+    __fetchResponses.delete(url);
+  }
+
+  // フィード鮮古: lastBuildDateが古いとwarningsに警告が入る
+  {
+    const xml = __buildAnthropicRss(staleBuildDate, [
+      __anthropicItemXml('Claude Code new feature', 'https://www.anthropic.com/news/example', recentPubDate, 'about claude code'),
+    ]);
+    __fetchResponses.set(url, { responseCode: 200, contentText: xml });
+    const { warnings } = fetchAnthropicRss(url, 'TestSource', 3);
+    assert(warnings.length === 1, 'fetchAnthropicRss: 鮮度が古いとwarningsが1件入る');
+    __fetchResponses.delete(url);
+  }
+
+  // 非200レスポンス: 空items・空warningsを返す
+  {
+    __fetchResponses.set(url, { responseCode: 500, contentText: '' });
+    const { items, warnings } = fetchAnthropicRss(url, 'TestSource', 3);
+    assert(items.length === 0 && warnings.length === 0, 'fetchAnthropicRss: 非200時は空items・空warnings');
+    __fetchResponses.delete(url);
+  }
+}
+
+/**
+ * fetchGitHubReleases のテスト（UrlFetchAppスタブ経由）
+ */
+function testFetchGitHubReleases() {
+  const apiUrl = `${CONFIG.GITHUB_RELEASES_API_URL}?per_page=${CONFIG.GITHUB_RELEASES_PER_PAGE}`;
+  const recent = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
+
+  // 正常系: 信頼できないURLのリリースは除外される
+  {
+    const releases = [
+      { tag_name: 'v1.0.0', name: 'v1.0.0', published_at: recent, html_url: 'https://github.com/anthropics/claude-code/releases/tag/v1.0.0' },
+      { tag_name: 'v1.0.1', name: 'v1.0.1', published_at: recent, html_url: 'https://evil.com/anthropics/claude-code/releases/tag/v1.0.1' },
+    ];
+    __fetchResponses.set(apiUrl, { responseCode: 200, contentText: JSON.stringify(releases) });
+    const items = fetchGitHubReleases(3);
+    assert(items.length === 1, 'fetchGitHubReleases: 信頼できないURLは除外され1件のみ');
+    assert(items[0].url === 'https://github.com/anthropics/claude-code/releases/tag/v1.0.0',
+      'fetchGitHubReleases: 信頼できるURLのみ残る');
+    __fetchResponses.delete(apiUrl);
+  }
+
+  // 非200レスポンス: 空配列を返す
+  {
+    __fetchResponses.set(apiUrl, { responseCode: 500, contentText: '' });
+    const items = fetchGitHubReleases(3);
+    assert(items.length === 0, 'fetchGitHubReleases: 非200時は空配列');
+    __fetchResponses.delete(apiUrl);
+  }
+}
+
+/**
+ * fetchZenn のテスト（UrlFetchAppスタブ経由）
+ */
+function testFetchZenn() {
+  const apiUrl = `${CONFIG.ZENN_API_URL}?topicname=${CONFIG.ZENN_TOPIC}&order=latest&count=${CONFIG.MAX_ITEMS_PER_SOURCE}`;
+  const recent = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
+  const data = {
+    articles: [
+      { title: '有効な記事', published_at: recent, path: '/someuser/articles/abc123' },
+      { title: '無効な記事', published_at: recent, path: '/../etc/passwd' },
+    ],
+  };
+  __fetchResponses.set(apiUrl, { responseCode: 200, contentText: JSON.stringify(data) });
+  const items = fetchZenn(3);
+  assert(items.length === 1, 'fetchZenn: 無効なpathは除外され1件のみ');
+  assert(items[0].url === 'https://zenn.dev/someuser/articles/abc123',
+    'fetchZenn: 有効なpathからURLが組み立てられる');
+  __fetchResponses.delete(apiUrl);
+}
+
+/**
+ * fetchQiita のテスト（UrlFetchAppスタブ経由）
+ */
+function testFetchQiita() {
+  const apiUrl = `${CONFIG.QIITA_API_URL}?query=tag:${CONFIG.QIITA_TAG}&per_page=${CONFIG.MAX_ITEMS_PER_SOURCE}`;
+  const recent = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
+  const articles = [
+    { title: '有効な記事', created_at: recent, url: 'https://qiita.com/someuser/items/abc123' },
+    { title: '無効な記事', created_at: recent, url: 'https://evil.com/qiita.com/items/abc123' },
+  ];
+  __fetchResponses.set(apiUrl, { responseCode: 200, contentText: JSON.stringify(articles) });
+  const items = fetchQiita(3);
+  assert(items.length === 1, 'fetchQiita: 信頼できないURLは除外され1件のみ');
+  assert(items[0].url === 'https://qiita.com/someuser/items/abc123',
+    'fetchQiita: 信頼できるURLのみ残る');
+  __fetchResponses.delete(apiUrl);
+}
+
+/**
+ * saveToSheet のテスト（SpreadsheetAppスタブ経由）
+ */
+function testSaveToSheet() {
+  __spreadsheets.clear();
+  const fixedDate = new Date('2026-07-19T08:00:00+09:00');
+  const makeItem = (url, title) => ({ title, url, date: fixedDate, source: 'Zenn' });
+
+  // 新規シートへの新規保存
+  {
+    const items = [makeItem('https://zenn.dev/a/articles/x', 'A'), makeItem('https://zenn.dev/b/articles/y', 'B')];
+    const newItems = saveToSheet(items);
+    assert(newItems.length === 2, 'saveToSheet: 新規2件が返る');
+
+    const sheet = SpreadsheetApp.openById(CONFIG.SHEET_ID).getSheetByName('ニュース履歴');
+    const rows = sheet.__rows();
+    assert(rows.length === 3, 'saveToSheet: ヘッダー1行＋データ2行の計3行が書き込まれる');
+    assert(rows[0][0] === '日付', 'saveToSheet: 1行目はヘッダー');
+    assert(rows[1][3] === 'https://zenn.dev/a/articles/x', 'saveToSheet: 2行目に1件目のURLが書き込まれる');
+  }
+
+  // 重複URLの除外
+  {
+    const items = [makeItem('https://zenn.dev/a/articles/x', 'A（重複）'), makeItem('https://zenn.dev/c/articles/z', 'C')];
+    const newItems = saveToSheet(items);
+    assert(newItems.length === 1 && newItems[0].url === 'https://zenn.dev/c/articles/z',
+      'saveToSheet: 既存URLは除外され新規1件のみ返る');
+
+    const sheet = SpreadsheetApp.openById(CONFIG.SHEET_ID).getSheetByName('ニュース履歴');
+    assert(sheet.__rows().length === 4, 'saveToSheet: 重複除外後は計4行（ヘッダー+3件）');
+  }
+
+  __spreadsheets.clear();
+}
+
+/**
+ * sendEmail のテスト（GmailAppスタブ経由）
+ */
+function testSendEmail() {
+  __gmailCalls.length = 0;
+  const items = [
+    { title: 'テスト記事', url: 'https://zenn.dev/a/articles/x', date: new Date('2026-07-19T08:00:00+09:00'), source: 'Zenn' },
+  ];
+  sendEmail(items, []);
+
+  assert(__gmailCalls.length === 1, 'sendEmail: GmailApp.sendEmailが1回呼ばれる');
+  const call = __gmailCalls[0];
+  assert(call.to === CONFIG.EMAIL_TO, 'sendEmail: 宛先がCONFIG.EMAIL_TOになる');
+  assert(call.subject.includes('1件'), 'sendEmail: 件名に件数が含まれる');
+  assert(call.options.htmlBody.includes('テスト記事'), 'sendEmail: htmlBodyに記事タイトルが含まれる');
+
+  __gmailCalls.length = 0;
+}
+
 /**
  * 全テストを実行する
  */
@@ -254,8 +449,8 @@ function runAllTests() {
 
   testParseValidDate();
   testIsFeedStale();
-  testSanitizeCell();
-  testSanitizeUrl();
+  testEscapeSheetFormula();
+  testEnforceHttpsScheme();
   testIsTrustedGithubReleaseUrl();
   testIsTrustedQiitaUrl();
   testParseDateOrSkip();
@@ -266,6 +461,12 @@ function runAllTests() {
   testBuildEmailHtmlSourceOrder();
   testIsTrustedPattern();
   testGetCutoffDate();
+  testFetchAnthropicRss();
+  testFetchGitHubReleases();
+  testFetchZenn();
+  testFetchQiita();
+  testSaveToSheet();
+  testSendEmail();
 
   Logger.log(`=== 全 ${TEST_COUNT} 件のテストが PASS しました ===`);
 }

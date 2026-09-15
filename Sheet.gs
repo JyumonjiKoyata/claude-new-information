@@ -41,7 +41,7 @@ function getOrCreateSheet() {
  * @param {string} value
  * @returns {string}
  */
-function sanitizeCell(value) {
+function escapeSheetFormula(value) {
   const s = String(value);
   return /^[=+\-@]/.test(s) ? "'" + s : s;
 }
@@ -78,9 +78,9 @@ function buildSheetRows(items, existingUrls, now) {
     const dateStr = Utilities.formatDate(item.date, 'Asia/Tokyo', 'yyyy/MM/dd');
     rows.push([
       dateStr,
-      sanitizeCell(item.source),
-      sanitizeCell(item.title),
-      sanitizeCell(item.url),
+      escapeSheetFormula(item.source),
+      escapeSheetFormula(item.title),
+      escapeSheetFormula(item.url),
       '', // 要約列（廃止済み・既存シートのレイアウト維持のため空欄）
       nowStr,
     ]);

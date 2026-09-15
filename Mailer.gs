@@ -21,7 +21,7 @@ function escapeHtml(str) {
  * @param {string} url
  * @returns {string}
  */
-function sanitizeUrl(url) {
+function enforceHttpsScheme(url) {
   const trimmed = String(url).trim();
   return /^https:\/\//i.test(trimmed) ? trimmed : '#';
 }
@@ -51,7 +51,7 @@ function buildItemCard(item) {
   const dateStr = Utilities.formatDate(item.date, 'Asia/Tokyo', 'MM/dd');
   const safeSource = escapeHtml(item.source);
   const safeTitle  = escapeHtml(item.title);
-  const safeUrl    = escapeHtml(sanitizeUrl(item.url));
+  const safeUrl    = escapeHtml(enforceHttpsScheme(item.url));
   return `
     <div style="
       background:#ffffff;
@@ -143,7 +143,7 @@ function buildSourceSection(source, groupItems) {
  * @returns {string}
  */
 function buildEmailHtml(items, dateLabel, warnings = []) {
-  const sheetUrl = escapeHtml(sanitizeUrl(`https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}`));
+  const sheetUrl = escapeHtml(enforceHttpsScheme(`https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}`));
 
   const sections = groupItemsBySource(items)
     .map(({ source, groupItems }) => buildSourceSection(source, groupItems))
